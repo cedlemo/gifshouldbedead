@@ -2,7 +2,7 @@ require "rake"
 
 Gem::Specification.new do |s|
   s.name        = "gifshouldbedead"
-  s.version     = "0.0.1"
+  s.version     = "0.0.2"
   s.summary     = "Register part of your screen as webm files."
   s.description = "Screencast based on the libs gstreamer and gtk3 from the ruby-gnome2 project"
   s.author      = "Cedric LE MOIGNE"

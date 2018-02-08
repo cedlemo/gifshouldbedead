@@ -1,1 +1,3 @@
-<video controls src="https://raw.githubusercontent.com/cedlemo/gifshouldbedead/master/rec.webm">Example</video>
+# GifShouldBeDead.
+
+<a href="https://s1.webmshare.com/NRaER.webm"><img scr="https://s1.webmshare.com/t/NRaER.jpg"></a>

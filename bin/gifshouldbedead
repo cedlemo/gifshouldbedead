@@ -1,4 +1,5 @@
 #!/usr/bin/env ruby
+
 require "gtk3"
 require "gstreamer"
 
@@ -10,33 +11,21 @@ class MainWindow < Gtk::Window
     header.set_title("GifShouldBeDead")
     header.show_close_button = true
     set_titlebar(header)
-    record_button = Gtk::Button.new(:label => "Select")
+    record_button = Gtk::Button.new(:label => "Record")
     stop_button = Gtk::Button.new(:label => "Stop")
     stop_button.sensitive = false
 
     record_button.signal_connect "clicked" do |widget|
-      if @recording_view.nil?
-        @recording_view = PartSelector.new(self)
-        record_button.label = "Record"
-        stop_button.sensitive = true
-      else
-        _x, _y, w, h = @recording_view.allocation.to_a
-        x, y = @recording_view.position
-       @recorder = Recorder.new("rec.webm", x, y, x+ w, y + h)
-       @recording_view.hide
-       sleep(0.5) # Wait that the window is fully hidden
-       @recorder.record
-        widget.sensitive = false
-      end
+      stop_button.sensitive = true
+      @recorder = Recorder.new("rec.webm", 0, 0)
+      @recorder.record
+       widget.sensitive = false
     end
 
     stop_button.signal_connect "clicked" do |widget|
       @recorder.stop_record if @recorder
       record_button.sensitive = true
       widget.sensitive = false
-      record_button.label = "Select"
-      @recording_view.destroy
-      @recording_view = nil
     end
 
     set_default_size(-1, 0)
@@ -47,29 +36,14 @@ class MainWindow < Gtk::Window
   end
 end
 
-class PartSelector < Gtk::Window
-  def initialize(parent)
-    super(:toplevel)
-    set_position(:center)
-    hb = Gtk::HeaderBar.new
-    hb.show_close_button = false
-    set_titlebar(hb)
-    set_opacity(0.5)
-    set_default_size(100, 100)
-    set_resizable(true)
-    set_transient_for(parent)
-    show
-    self.window.pass_through = true
-  end
-end
-
 class Recorder
   def initialize(output_file, startx = 0, starty = 0, endx = nil, endy=nil)
     @pipeline = Gst::Pipeline.new("my-pipeline")
     desc = "ximagesrc " + "startx=#{startx} starty=#{starty} "
     desc += "endx=#{endx} " if endx
     desc += "endy=#{endy} " if endy
-    desc += "name=\"videosrc\" !video/x-raw,framerate=25/1 ! videoconvert ! vp8enc ! queue "
+    desc += "name=\"videosrc\" !video/x-raw,framerate=25/1 ! queue ! videoconvert ! queue ! vp8enc ! queue"
+
     videobin = Gst.parse_bin_from_description(desc, true)
     mux = Gst::ElementFactory.make("webmmux")
     sink = Gst::ElementFactory.make("filesink")
@@ -91,6 +65,7 @@ class Recorder
     @pipeline.state = :null
   end
 end
+
 win = MainWindow.new
 win.show_all
 Gtk.main
