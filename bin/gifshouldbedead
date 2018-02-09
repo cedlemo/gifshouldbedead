@@ -3,22 +3,34 @@
 require "gtk3"
 require "gstreamer"
 require "fileutils"
+require "date"
+
+CURRENT_PATH = File.expand_path(File.dirname(__FILE__))
+LIB_PATH = "#{CURRENT_PATH}/../lib"
+DATA_PATH = "#{CURRENT_PATH}/../data"
+CONFIG_DIR = File.expand_path("#{ENV['HOME']}/.config/gifshouldbedead")
+USR_CSS = "#{CONFIG_DIR}/gifshouldbedead.css"
+
+
 
 class GsbdWindow < Gtk::ApplicationWindow
-  def initialize
+  def initialize(application)
     super(application)
-
+    name = "gsbd-window"
     header = Gtk::HeaderBar.new
     header.set_title("GifShouldBeDead")
     header.show_close_button = true
+    header.name = "gsbd-headerbar"
     set_titlebar(header)
     record_button = Gtk::Button.new(:label => "Record")
+    record_button.name = "gsbd-record"
     stop_button = Gtk::Button.new(:label => "Stop")
     stop_button.sensitive = false
-
+    stop_button.name = "gsbd-stop"
     record_button.signal_connect "clicked" do |widget|
       stop_button.sensitive = true
-      @recorder = Recorder.new("rec.webm", 0, 0)
+      default_name = "#{ENV['HOME']}/#{Time.now.strftime("%d-%m-%Y-%H-%M.webm")}"
+      @recorder = Recorder.new(default_name, 0, 0)
       @recorder.record
        widget.sensitive = false
     end
@@ -34,6 +46,7 @@ class GsbdWindow < Gtk::ApplicationWindow
     header.pack_end(stop_button)
 
     signal_connect("delete_event") { Gtk.main_quit }
+    show_all
   end
 end
 
@@ -78,6 +91,7 @@ class GsbdApplication < Gtk::Application
     super("com.github.cedlemo.gifshouldbedead", [:non_unique,:handles_command_line])
 
     signal_connect "startup" do |application|
+      check_and_create_if_no_config_dir
       initialize_css_provider
       load_css_config
     end
@@ -86,15 +100,7 @@ class GsbdApplication < Gtk::Application
 
       window = GsbdWindow.new(application)
       window.present
-
-      if @options[:execute]
-        window.add_terminal(@options[:execute])
-      else
-        window.add_terminal
-      end
-      window.terminal.grab_focus
     end
-
 
     signal_connect "command-line" do |_application, command_line|
       begin
@@ -113,15 +119,6 @@ class GsbdApplication < Gtk::Application
         @exit_status
       end
     end
-  end
-
-  def check_css_file_path
-    css_file = if File.exist?(@settings["css-file"])
-                 @settings["css-file"]
-               else
-                 "#{CONFIG_DIR}/#{@settings["css-file"]}"
-               end
-    File.exist?(css_file) ? css_file : nil
   end
 
   private
@@ -156,35 +153,47 @@ class GsbdApplication < Gtk::Application
   end
 
   def load_custom_css(file)
-    if @settings["custom-css"]
-      @css_content = File.open(file, "r").read
-      @provider.load(:data => @css_content)
-    else
-      @provider.load(:data => "")
-    end
+    @css_content = File.open(file, "r").read
+    @provider.load(:data => @css_content)
   end
 
   def load_css_config
-    return unless @settings["custom-css"]
-    css_file = check_css_file_path
-    if css_file
-      begin
-        load_custom_css(css_file)
-      rescue => e
-        puts "Bad css file using default css #{e.message}"
-        error_popup = TopinambourCssErrorPopup.new(self.windows.first)
-        error_popup.message = e.message + "\n\nBad css file using default css"
-        error_popup.show_all
-      end
-    else
-      puts "No custom CSS, using default theme"
+    return unless File.exists?(USR_CSS)
+    begin
+      load_custom_css(css_file)
+    rescue => e
+      puts "Bad css file using default css #{e.message}"
+      error_popup = GshbdCssErrorPopup.new(self.windows.first)
+      error_popup.message = e.message + "\n\nBad css file using default css"
+      error_popup.show_all
     end
   end
 
   def check_and_create_if_no_config_dir
     Dir.mkdir(CONFIG_DIR) unless Dir.exist?(CONFIG_DIR)
   end
+end
 
+class GsbdCssErrorPopup < Gtk::MessageDialog
+
+  def initialize(parent)
+    super(:parent => parent, :flags => 0,
+          :type => Gtk::MessageType::ERROR,
+          :buttons_type => Gtk::ButtonsType::CLOSE,
+          :message => "Css Error")
+
+    @message = Gtk::Label.new("")
+    content_area.add(@message)
+    signal_connect("response") { |widget| widget.destroy }
+  end
+
+  def message=(message)
+    @message.text = message
+  end
+
+  def message
+    @message.text
+  end
 end
 
 Signal.trap("INT") {
@@ -196,17 +205,6 @@ Signal.trap("TERM") {
   STDERR.puts "\tgifshouldbedead processus pid = #{Process.pid} has been killed"
   exit
 }
-
-CURRENT_PATH = File.expand_path(File.dirname(__FILE__))
-LIB_PATH = "#{CURRENT_PATH}/../lib"
-DATA_PATH = "#{CURRENT_PATH}/../data"
-CONFIG_DIR = File.expand_path("#{ENV['HOME']}/.config/gifshouldbedead")
-USR_CSS = "#{CONFIG_DIR}/gifshouldbedead.css"
-gresource_bin = "#{DATA_PATH}/gifshouldbedead.gresource"
-
-resource = Gio::Resource.load(gresource_bin)
-Gio::Resources.register(resource)
-# Load default libraries !!WARNING!! loading order matters
 
 gifshouldbedead = GsbdApplication.new
 
